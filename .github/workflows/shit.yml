@@ -1,41 +1,33 @@
-name: macOS Remote Desktop with GPU
+name: macOS Tailscale VNC Access
 
 on:
   workflow_dispatch:
 
 jobs:
-  macos-rdp:
-    # macos-14 provides Apple Silicon (M1/M2) environment with native Metal GPU acceleration
-    runs-on: macos-14 
-    
+  macos-vnc:
+    runs-on: macos-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Enable Built-in macOS Screen Sharing (VNC)
-        run: |
-          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist
-          # Set password for the runner user
-          echo "runner:password123" | sudo chpasswd
-          echo "Screen Sharing (VNC) has been successfully enabled."
-
-      - name: Connect to Tailscale Network
-        uses: tailscale/github-action@v2
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v4
         with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          args: --ssh
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          version: latest
 
+      - name: Enable macOS Screen Sharing (VNC)
+        run: |
+          echo "Enabling remote management..."
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -users runner -privs -all -restart -agent -pcm
+
+          echo "Getting Tailscale IP address..."
+          tailscale ip -4
+          
       - name: Keep Runner Alive
         run: |
-          echo "===================================================="
-          echo "Runner is ready!"
-          echo "Check your Tailscale dashboard for the runner's IP."
-          echo "Connect via VNC Viewer using credentials:"
-          echo "Username: runner"
-          echo "Password: password123"
-          echo "===================================================="
-          # Keep session running for up to 6 hours
-          sleep 21600
+          echo "VNC server is running over Tailscale. You can connect using your Tailscale IP."
+          sleep 3600
           
